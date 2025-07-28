@@ -11,6 +11,8 @@ pub async fn send(data: &types::SendData) -> Result<String, reqwest::Error> {
         .json(data)
         .send()
         .await?;
+
     let res_data: types::ReadData = response.json().await?;
+
     Ok(res_data.id)
 }
