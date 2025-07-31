@@ -45,7 +45,7 @@ pub fn get_new_posts(result: &types::Response, last_read: u64) -> Vec<&types::It
     filtered_posts
 }
 
-pub async fn start(tx: mpsc::Sender<News>, group: &str, readable_name: &str) {
+pub async fn start(tx: mpsc::Sender<News>, group: &str, readable_name: &str, category: u8) {
     println!("Пытаюсь читать группу {readable_name}");
     let mut last_read: u64 = 0;
     let readable_string = readable_name.to_string();
@@ -68,6 +68,7 @@ pub async fn start(tx: mpsc::Sender<News>, group: &str, readable_name: &str) {
                             text: post.text.clone(),
                             author: readable_string.clone(),
                             date: post.date,
+                            category,
                         };
                         if let Err(e) = tx.send(news).await {
                             println!("{e}");
