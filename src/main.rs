@@ -1,28 +1,38 @@
 mod admin;
 mod config;
 mod model;
-mod telegram;
 mod vk;
-use std::fs::read;
 
-use dotenv::dotenv;
-// use crate::admin::sender;
-// use crate::admin::types as admin_types;
-// use crate::config::admin as admin_config;
+use crate::model::news::News;
 use crate::vk::reader;
+use chrono::{DateTime, Local, Utc};
+use dotenv::dotenv;
+use tokio::sync::mpsc;
+use tokio::task;
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    let (tx, mut rx) = mpsc::channel::<News>(100);
 
-    match reader::read_posts("vk", "1").await {
-        Ok(posts) => {
-            for item in posts.response.items {
-                println!("{}", item.text);
-            }
-        }
-        Err(e) => {
-            println!("{e}");
+    let group = "tassagency";
+    let readable_name = "ТАСС";
+
+    task::spawn(async move {
+        reader::start(tx.clone(), group, readable_name).await;
+    });
+
+    println!("Начинаем читать записи из группы {readable_name}\n\n");
+    while let Some(news) = rx.recv().await {
+        let author = news.author;
+        let text = news.text;
+        let timestamp = news.date as i64;
+
+        if let Some(datetime) = DateTime::<Utc>::from_timestamp(timestamp, 0) {
+            let dt_local: DateTime<Local> = datetime.with_timezone(&Local);
+            //println!("{dt_local} - {author}\n\n{text}\n\n------------------\n\n")
+        } else {
+            //println!("{author}\n\n{text}")
         }
     }
 }

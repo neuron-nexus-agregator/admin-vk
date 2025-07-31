@@ -27,63 +27,59 @@ pub async fn read_posts(url: &str, limit: &str) -> Result<types::Response, reqwe
     Ok(response)
 }
 
-pub fn get_new_posts(result: &types::Response, last_read: u64) -> Vec<String> {
-    let mut filtered_posts: Vec<_> = result
-        .response
-        .items
-        .iter()
-        .filter(|post| post.date > last_read)
-        .collect();
-
-    // Сортируем по возрастанию date
-    filtered_posts.sort_by_key(|post| post.date);
-
+pub fn get_new_posts(result: &types::Response, last_read: u64) -> Vec<&types::Item> {
+    println!("Начинаем проверять посты с {last_read}");
+    let mut filtered_posts: Vec<&types::Item> = vec![];
+    for item in result.response.items.iter() {
+        if item.date > last_read && !item.text.is_empty() {
+            let text = item.text.to_string();
+            let date = item.date;
+            println!("Найден подходящий пост с текстом: {text} и timestamp: {date} > {last_read}");
+            filtered_posts.push(item);
+        } else if let Some(d) = item.is_pinned
+            && d != 1
+        {
+            break;
+        }
+    }
     filtered_posts
-        .into_iter()
-        .map(|post| post.text.clone())
-        .collect()
 }
 
 pub async fn start(tx: mpsc::Sender<News>, group: &str, readable_name: &str) {
+    println!("Пытаюсь читать группу {readable_name}");
     let mut last_read: u64 = 0;
     let readable_string = readable_name.to_string();
-    let sleep_secs = 60 * 5;
+    let sleep_secs = 60 * 5; // 5 минут
     loop {
-        if last_read == 0 {
-            match read_posts(group, "1").await {
-                Ok(result) => {
-                    if !result.response.items.is_empty() {
-                        let date = result.response.items[0].date;
-                        last_read = date;
+        match read_posts(group, "10").await {
+            Ok(result) => {
+                if last_read == 0 {
+                    if result.response.items.len() > 1 {
+                        last_read = std::cmp::max(
+                            result.response.items[0].date,
+                            result.response.items[1].date,
+                        )
+                    } else if result.response.items.len() == 1 {
+                        last_read = result.response.items[0].date;
                     }
-                }
-                Err(e) => {
-                    println!("{e}");
-                }
-            }
-        } else {
-            match read_posts(group, "10").await {
-                Err(e) => {
-                    println!("{e}");
-                }
-                Ok(result) => {
-                    let new_posts = get_new_posts(&result, last_read);
-                    if !new_posts.is_empty() {
-                        for post in new_posts {
-                            let news = News {
-                                text: post,
-                                author: readable_string.clone(),
-                            };
-                            if let Err(e) = tx.send(news).await {
-                                println!("{e}");
-                            }
+                } else {
+                    for post in get_new_posts(&result, last_read) {
+                        let news = News {
+                            text: post.text.clone(),
+                            author: readable_string.clone(),
+                            date: post.date,
+                        };
+                        if let Err(e) = tx.send(news).await {
+                            println!("{e}");
                         }
+                        last_read = last_read.max(post.date);
                     }
-                    last_read = result.response.items[0].date;
                 }
             }
+            Err(err) => println!("Не удалось прочитать посты: {err}"),
         }
 
+        println!("{readable_name} отправляется спать на {sleep_secs} секунд");
         sleep(Duration::from_secs(sleep_secs)).await;
     }
 }
