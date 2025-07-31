@@ -1,7 +1,6 @@
 use crate::config::vk;
 use crate::model::news::News;
 use crate::vk::types;
-use reqwest;
 use std::env;
 use tokio::sync::mpsc;
 use tokio::time::{Duration, sleep};
@@ -71,7 +70,7 @@ pub async fn start(tx: mpsc::Sender<News>, group: &str, readable_name: &str, cat
                             category,
                         };
                         if let Err(e) = tx.send(news).await {
-                            println!("{e}");
+                            eprintln!("{e}");
                         }
                         last_read = last_read.max(post.date);
                     }
