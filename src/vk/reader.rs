@@ -6,7 +6,10 @@ use tokio::sync::mpsc;
 use tokio::time::{Duration, sleep};
 
 pub async fn read_posts(url: &str, limit: &str) -> Result<types::Response, reqwest::Error> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (compatible; MyVkBot/1.0)")
+        .build()
+        .unwrap();
 
     let response_url = client
         .get(vk::GET_URL)
@@ -63,8 +66,12 @@ pub async fn start(tx: mpsc::Sender<News>, group: &str, readable_name: &str, cat
                     }
                 } else {
                     for post in get_new_posts(&result, last_read) {
+                        let url = format!(
+                            "\n\n\nИсточник: https://vk.com/{group}?w=wall{}_{}",
+                            post.owner_id, post.id
+                        );
                         let news = News {
-                            text: post.text.clone(),
+                            text: post.text.clone() + &url,
                             author: readable_string.clone(),
                             date: post.date,
                             category,

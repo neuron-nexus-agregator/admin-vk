@@ -17,15 +17,14 @@ use dotenv::dotenv;
 use tokio::sync::mpsc;
 use tokio::task;
 
+use tokio::time::{Duration, sleep};
+
 #[tokio::main]
 async fn main() {
     dotenv().ok();
     let detector = Detector::new();
     let (tx, mut rx) = mpsc::channel::<News>(100);
     let (admin_tx, admin_rx) = mpsc::channel::<types::SendData>(100);
-
-    //TODO: получить источники из базы
-    //TODO: в цикле запускать читателей для каждого источника
 
     match sources::get_sources().await {
         Err(e) => {
@@ -34,7 +33,7 @@ async fn main() {
             std::process::exit(1);
         }
         Ok(sources) => {
-            start_sources(sources, tx);
+            start_sources(sources, tx).await;
         }
     }
 
@@ -84,7 +83,7 @@ fn get_sentences(text: String, source: String, detector: &Detector) -> (String, 
     (title, desc)
 }
 
-fn start_sources(sources: Vec<NewsSource>, tx: mpsc::Sender<News>) {
+async fn start_sources(sources: Vec<NewsSource>, tx: mpsc::Sender<News>) {
     for source in sources {
         let t = tx.clone();
         let gr = source.vk;
@@ -102,5 +101,7 @@ fn start_sources(sources: Vec<NewsSource>, tx: mpsc::Sender<News>) {
         task::spawn(async move {
             reader::start(t, gr.as_str(), readable.as_str(), cat).await;
         });
+
+        sleep(Duration::from_secs(2)).await;
     }
 }

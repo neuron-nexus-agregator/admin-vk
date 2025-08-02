@@ -31,7 +31,7 @@ pub async fn get_sources() -> Result<Vec<types::NewsSource>, Error> {
     let mut a: Vec<types::NewsSource> = Vec::new();
     // Обработка результатов
     for row in rows {
-        let id: u32 = row.get("id");
+        let id: i32 = row.get("id");
         let vk: String = row.get("vk");
         let readable: String = row.get("readable");
         let is_rt: bool = row.get("is_rt");
